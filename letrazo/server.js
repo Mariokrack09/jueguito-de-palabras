@@ -3,14 +3,14 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const { Server } = require('socket.io');
-
+ 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
-
+ 
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('/health', (_req, res) => res.send('ok'));
-
+ 
 /* ---------- Diccionario ---------- */
 // Quita tildes pero conserva la Ñ. Todo en mayúsculas.
 const norm = (s) =>
@@ -21,10 +21,10 @@ const norm = (s) =>
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/\u0001/g, 'ñ')
     .toUpperCase();
-
+ 
 let DICT = new Set();
 let LENIENT = true; // sin diccionario: se acepta cualquier camino válido
-
+ 
 function loadDict() {
   let list = [];
   try {
@@ -46,16 +46,16 @@ function loadDict() {
     : `Diccionario cargado: ${set.size} palabras.`);
 }
 loadDict();
-
+ 
 /* ---------- Tablero ---------- */
 const FREQ = { A:12, E:13, O:9, S:8, R:7, N:7, I:6, D:5, L:5, C:5, T:4, U:4, M:3, P:3, B:2, H:1, Y:1, V:1, G:1, F:1, J:1, Z:1, Ñ:1, X:1 };
 const BAG = [];
 for (const [l, n] of Object.entries(FREQ)) for (let i = 0; i < n; i++) BAG.push(l);
-
+ 
 const SIZES = [4, 8, 16];
 const MINS = [3, 4, 5];
 const DURATIONS = { 4: 90, 8: 120, 16: 180 }; // segundos por ronda
-
+ 
 function makeGrid(n) {
   const total = n * n;
   for (;;) {
@@ -64,7 +64,7 @@ function makeGrid(n) {
     if (v >= 0.31 && v <= 0.45) return g;
   }
 }
-
+ 
 function hasPath(grid, n, word) {
   const used = Array(n * n).fill(false);
   const dfs = (i, k) => {
@@ -87,14 +87,18 @@ function hasPath(grid, n, word) {
   for (let i = 0; i < n * n; i++) if (dfs(i, 0)) return true;
   return false;
 }
-
+ 
 const points = (len) => (len <= 4 ? 1 : len === 5 ? 2 : len === 6 ? 3 : len === 7 ? 5 : 11);
-
+// classic: tabla de puntos y las palabras repetidas no puntúan.
+// letters: cada palabra vale tantos puntos como letras tiene y todas cuentan.
+const MODES = ['classic', 'letters'];
+const pointsFor = (mode, len) => (mode === 'letters' ? len : points(len));
+ 
 /* ---------- Salas ---------- */
 const ROUNDS = 3;
 const COIN_ROUND = 5, COIN_MATCH = 15, COIN_WIN = 10;
 const rooms = new Map();
-
+ 
 function makeCode() {
   const c = 'ABCDEFGHJKLMNPRSTUVWXYZ';
   for (;;) {
@@ -103,31 +107,31 @@ function makeCode() {
     if (!rooms.has(s)) return s;
   }
 }
-
+ 
 function newRoom() {
   const room = {
     code: makeCode(), players: new Map(), hostId: null, phase: 'lobby',
-    grid: [], endsAt: 0, round: 0, timer: null, size: 4, minLen: 3,
+    grid: [], endsAt: 0, round: 0, timer: null, size: 4, minLen: 3, mode: 'classic',
   };
   rooms.set(room.code, room);
   return room;
 }
-
+ 
 function publicState(room) {
   return {
     code: room.code, phase: room.phase, hostId: room.hostId,
-    round: room.round, totalRounds: ROUNDS, size: room.size, minLen: room.minLen, duration: DURATIONS[room.size],
+    round: room.round, totalRounds: ROUNDS, size: room.size, minLen: room.minLen, mode: room.mode, duration: DURATIONS[room.size],
     players: [...room.players.values()].map((p) => ({
       id: p.id, name: p.name, total: p.total, count: p.words.size,
     })),
   };
 }
 const broadcast = (room) => io.to(room.code).emit('room:update', publicState(room));
-
+ 
 function roundPayload(room, remaining) {
   return { grid: room.grid, size: room.size, minLen: room.minLen, remaining, round: room.round };
 }
-
+ 
 function startRound(room) {
   const dur = DURATIONS[room.size] * 1000;
   room.round += 1;
@@ -140,7 +144,7 @@ function startRound(room) {
   broadcast(room);
   io.to(room.code).emit('round:start', roundPayload(room, dur));
 }
-
+ 
 function endRound(room) {
   if (room.phase !== 'playing') return;
   clearTimeout(room.timer);
@@ -152,8 +156,8 @@ function endRound(room) {
   for (const p of room.players.values()) {
     let roundScore = 0;
     const words = [...p.words.keys()].map((w) => {
-      const shared = seen.get(w) > 1;
-      const pts = points(w.length);
+      const shared = room.mode === 'classic' && seen.get(w) > 1;
+      const pts = pointsFor(room.mode, w.length);
       if (!shared) roundScore += pts;
       return { w, pts, shared };
     }).sort((a, b) => b.w.length - a.w.length || a.w.localeCompare(b.w));
@@ -175,10 +179,10 @@ function endRound(room) {
     }
     r.coins = coins;
   }
-  io.to(room.code).emit('round:end', { round: room.round, totalRounds: ROUNDS, results, final });
+  io.to(room.code).emit('round:end', { round: room.round, totalRounds: ROUNDS, mode: room.mode, results, final });
   broadcast(room);
 }
-
+ 
 io.on('connection', (socket) => {
   socket.on('join', ({ name, code } = {}, ack = () => {}) => {
     name = String(name || '').trim().slice(0, 14) || 'Jugador';
@@ -200,21 +204,22 @@ io.on('connection', (socket) => {
       socket.emit('round:start', roundPayload(room, Math.max(0, room.endsAt - Date.now())));
     }
   });
-
-  socket.on('settings', ({ size, minLen } = {}) => {
+ 
+  socket.on('settings', ({ size, minLen, mode } = {}) => {
     const room = rooms.get(socket.data.code);
     if (!room || room.hostId !== socket.id || room.phase !== 'lobby') return;
     if (SIZES.includes(size)) room.size = size;
     if (MINS.includes(minLen)) room.minLen = minLen;
+    if (MODES.includes(mode)) room.mode = mode;
     broadcast(room);
   });
-
+ 
   socket.on('start', () => {
     const room = rooms.get(socket.data.code);
     if (!room || room.hostId !== socket.id) return;
     if (room.phase === 'lobby') startRound(room);
   });
-
+ 
   socket.on('next', () => {
     const room = rooms.get(socket.data.code);
     if (!room || room.hostId !== socket.id || room.phase !== 'results') return;
@@ -224,7 +229,7 @@ io.on('connection', (socket) => {
     for (const p of room.players.values()) { p.total = 0; p.words = new Map(); p.rounds = 0; }
     broadcast(room);
   });
-
+ 
   socket.on('word', ({ word } = {}, ack = () => {}) => {
     const room = rooms.get(socket.data.code);
     const p = room && room.players.get(socket.id);
@@ -235,10 +240,10 @@ io.on('connection', (socket) => {
     if (!hasPath(room.grid, room.size, w)) return ack({ ok: false, error: 'No se puede formar en el tablero.' });
     if (!LENIENT && !DICT.has(w)) return ack({ ok: false, error: 'No está en el diccionario.' });
     p.words.set(w, true);
-    ack({ ok: true, word: w, pts: points(w.length) });
+    ack({ ok: true, word: w, pts: pointsFor(room.mode, w.length) });
     broadcast(room);
   });
-
+ 
   socket.on('disconnect', () => {
     const room = rooms.get(socket.data.code);
     if (!room) return;
@@ -248,6 +253,8 @@ io.on('connection', (socket) => {
     broadcast(room);
   });
 });
-
+ 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => console.log(`Letrazo escuchando en el puerto ${PORT}`));
+ 
+Claude ha terminado la respuesta
