@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Letrazo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Special+Elite&family=Playfair+Display:wght@900&family=Press+Start+2P&family=Caveat:wght@700&family=Bungee&display=swap" rel="stylesheet">
+<style>
+:root{
+  --felt:#0f3d3e; --felt-2:#0b2e2f; --ivory:#f4e8c8; --ivory-edge:#cdbb8c; --ink:#2a1f14;
+  --coral:#ff6b4a; --sun:#ffd23f; --mint:#7fe0b0; --mute:#8fb3ae; --white:#fff;
+  --font:'Fredoka','Trebuchet MS','Segoe UI',system-ui,sans-serif;
+  /* Cosméticos de la tienda (los cambia el JS) */
+  --tfont:var(--font); --fs:1; --fw:700;
+  --t-bg:var(--ivory); --t-fg:#2a1f14; --t-edge:var(--ivory-edge); --t-glow:none;
+  --t-on:var(--sun); --t-on-fg:#2a1f14; --t-on-edge:#c79f10;
+  --bg-1:#17595a; --bg-extra:none; --bg-extra-size:auto; --board-bg:rgba(0,0,0,.2);
+}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;color:var(--white);font-family:var(--font)}
+body{background-color:var(--felt);background-image:var(--bg-extra),radial-gradient(1200px 700px at 50% -10%,var(--bg-1) 0%,var(--felt) 55%,var(--felt-2) 100%);
+  background-size:var(--bg-extra-size),auto;background-attachment:fixed;
+  padding:max(16px,env(safe-area-inset-top)) 16px max(16px,env(safe-area-inset-bottom))}
+main{max-width:520px;margin:0 auto}
+main.w8{max-width:640px} main.w16{max-width:820px}
+[hidden]{display:none!important}
+h1,h2,h3,p{margin:0}
+.logo{font-size:clamp(44px,13vw,64px);font-weight:700;letter-spacing:.02em;text-align:center;line-height:1;margin:18px 0 6px;display:flex;justify-content:center;gap:4px}
+.logo span{display:inline-block;background:var(--ivory);color:var(--ink);width:.9em;height:.9em;border-radius:.16em;
+  display:grid;place-items:center;box-shadow:0 .08em 0 var(--ivory-edge);font-size:.86em}
+.logo span:nth-child(3n+1){transform:rotate(-4deg)} .logo span:nth-child(3n+2){transform:rotate(3deg)} .logo span:nth-child(3n){transform:rotate(-1deg)}
+.logo span.hot{background:var(--coral);color:var(--white);box-shadow:0 .08em 0 #c24b30}
+.tag{text-align:center;color:var(--mute);margin-bottom:22px}
+.panel{background:rgba(0,0,0,.22);border-radius:20px;padding:18px;margin-bottom:14px}
+label{display:block;font-weight:500;margin:0 0 6px;color:var(--mute)}
+input[type=text]{width:100%;font:inherit;font-size:18px;padding:12px 14px;border-radius:14px;border:2px solid transparent;background:var(--ivory);color:var(--ink);outline:none}
+input[type=text]:focus-visible{border-color:var(--sun)}
+.row{display:flex;gap:10px}.row>*{flex:1}
+button{font:inherit;font-weight:600;font-size:18px;border:0;border-radius:14px;padding:13px 16px;cursor:pointer;color:var(--white);background:var(--coral);box-shadow:0 4px 0 #c24b30;transition:transform .05s,box-shadow .05s}
+button:active{transform:translateY(3px);box-shadow:0 1px 0 #c24b30}
+button:focus-visible{outline:3px solid var(--sun);outline-offset:2px}
+button.alt{background:#1d6a6a;box-shadow:0 4px 0 #134a4a}
+button.alt:active{box-shadow:0 1px 0 #134a4a}
+button:disabled{opacity:.5;cursor:default}
+.error{color:#ffb4a3;min-height:1.3em;margin-top:10px}
+.rules{color:var(--mute);line-height:1.5;font-size:15px}
+
+/* lobby */
+.code{font-size:56px;font-weight:700;letter-spacing:.18em;text-align:center;color:var(--sun);line-height:1.1}
+.players{list-style:none;padding:0;margin:12px 0 0;display:flex;flex-wrap:wrap;gap:8px}
+.players li{background:#1d6a6a;border-radius:999px;padding:6px 14px;font-weight:500}
+.players li.host::after{content:" ★";color:var(--sun)}
+.players li.me{outline:2px solid var(--sun)}
+
+/* juego */
+.bar{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-weight:600}
+.time{font-size:28px;font-variant-numeric:tabular-nums}
+.meter{height:10px;border-radius:999px;background:rgba(0,0,0,.3);overflow:hidden;margin-bottom:14px}
+.meter i{display:block;height:100%;width:100%;background:var(--mint);transform-origin:left;transition:background .3s}
+.meter.low i{background:var(--coral)}
+.current{font-family:var(--tfont);height:52px;display:grid;place-items:center;font-size:34px;font-weight:700;letter-spacing:.12em}
+.toast{height:26px;text-align:center;font-weight:500;margin-bottom:8px}
+.toast.ok{color:var(--mint)} .toast.bad{color:#ffb4a3}
+#grid{font-size:40px;display:grid;grid-template-columns:repeat(var(--n,4),1fr);gap:var(--gap,10px);touch-action:none;user-select:none;-webkit-user-select:none;margin-bottom:14px}
+.tile{aspect-ratio:1;display:grid;place-items:center;background:var(--t-bg);color:var(--t-fg);border-radius:16%;
+  font-family:var(--tfont);font-size:calc(1em * var(--fs));font-weight:var(--fw);text-shadow:var(--t-glow);box-shadow:0 5px 0 var(--t-edge);transition:transform .06s,background .06s}
+.tile.on{background:var(--t-on);color:var(--t-on-fg);transform:translateY(4px);box-shadow:0 1px 0 var(--t-on-edge)}
+form.type{margin-bottom:14px}
+.found{display:flex;flex-wrap:wrap;gap:6px;min-height:34px;margin-bottom:14px}
+.chip{background:rgba(255,255,255,.12);border-radius:999px;padding:4px 12px;font-weight:500}
+.board{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.board li{display:flex;justify-content:space-between;background:rgba(0,0,0,.22);border-radius:12px;padding:8px 12px}
+.board li.me{outline:2px solid var(--sun)}
+.board small{color:var(--mute);margin-left:8px}
+
+/* resultados */
+.res{background:rgba(0,0,0,.22);border-radius:20px;padding:14px 16px;margin-bottom:12px}
+.res header{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px}
+.res h3{font-size:20px}.res .pts{color:var(--sun);font-weight:700}
+.res.first{outline:2px solid var(--sun)}
+.words{display:flex;flex-wrap:wrap;gap:6px}
+.w{background:var(--ivory);color:var(--ink);border-radius:999px;padding:3px 11px;font-weight:600;font-size:15px}
+.w.shared{background:transparent;color:var(--mute);text-decoration:line-through;border:1px dashed var(--mute)}
+.none{color:var(--mute)}
+.w.half{background:transparent;color:var(--ivory);border:1px dashed var(--ivory-edge)}
+.rep{padding:6px 0;border-top:1px solid rgba(255,255,255,.1);line-height:1.4}
+.rep b{color:var(--sun);margin-right:6px}
+.revword{font-size:clamp(34px,11vw,56px);font-weight:700;letter-spacing:.1em;color:var(--sun);min-height:1.2em;margin:4px 0 10px}
+.revrow{display:flex;justify-content:space-between;gap:12px;padding:9px 14px;background:rgba(0,0,0,.25);border-radius:12px;margin-top:6px;font-weight:500;text-align:left}
+.revrow b{color:var(--mint)}
+.revrow.half b{color:var(--ivory-edge)}
+/* Pantalla ancha: tablero grande a la izquierda y el panel de juego a la derecha */
+@media (min-width:1000px){
+  main.w8,main.w16{max-width:1500px}
+  #game.big{display:grid;grid-template-columns:minmax(0,1fr) 340px;grid-template-rows:repeat(8,max-content) 1fr;column-gap:24px;align-items:start}
+  #game.big > #gridWrap{grid-column:1;grid-row:1 / 10;max-height:calc(100vh - 56px);max-height:calc(100dvh - 56px)}
+  #game.big > :not(#gridWrap){grid-column:2}
+}
+@keyframes pop{from{transform:scale(.92);opacity:0}to{transform:none;opacity:1}}
+@media (prefers-reduced-motion:no-preference){.revrow{animation:pop .25s ease-out}}
+.wallet{text-align:right;color:var(--sun);font-weight:600;font-size:15px;padding:4px 2px}
+.coins{text-align:center;color:var(--sun);font-weight:600;margin:0 0 14px;min-height:1.3em}
+.seg{display:flex;gap:8px}
+.seg button{flex:1;font-size:17px;padding:10px 8px;background:#1d6a6a;box-shadow:0 4px 0 #134a4a}
+.seg button[aria-pressed=true]{background:var(--sun);color:var(--ink);box-shadow:0 4px 0 #c79f10}
+.seg button:disabled{opacity:1;cursor:default}
+.seg button:disabled[aria-pressed=false]{opacity:.45}
+#grid.g8,#grid.g16{grid-template-columns:repeat(var(--n),var(--tile));width:max-content;margin:0 auto}
+#gridWrap{padding:10px;border-radius:18px;background:var(--board-bg);margin-bottom:14px}
+#gridWrap #grid{margin-bottom:0}
+#gridWrap[data-n="8"],#gridWrap[data-n="16"]{overflow:auto;max-height:calc(100vh - 300px);max-height:calc(100dvh - 300px);padding:8px;border-radius:16px;overscroll-behavior:contain}
+#gridWrap[data-n="8"] #grid,#gridWrap[data-n="16"] #grid{margin-bottom:0}
+#gridWrap.move #grid{touch-action:pan-x pan-y}
+.tools{display:flex;gap:8px;margin-bottom:10px}
+.tools button{flex:1;font-size:16px;padding:8px 10px;background:#1d6a6a;box-shadow:0 3px 0 #134a4a}
+.tools button[aria-pressed=true]{background:var(--sun);color:var(--ink);box-shadow:0 3px 0 #c79f10}
+#grid.g8 .tile{box-shadow:0 3px 0 var(--t-edge);border-radius:14%}
+#grid.g16 .tile{box-shadow:0 2px 0 var(--t-edge);border-radius:12%}
+#grid.g8 .tile.on{transform:translateY(2px);box-shadow:0 1px 0 var(--t-on-edge)}
+#grid.g16 .tile.on{transform:translateY(1px);box-shadow:0 1px 0 var(--t-on-edge)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+.hhint{margin:8px 0;padding:8px 12px;border-radius:12px;text-align:center;font-weight:800;color:#2b1a00;background:linear-gradient(90deg,#ffd54a,#ff9f1c);box-shadow:0 0 18px rgba(255,180,40,.45);animation:hpulse 1.6s ease-in-out infinite}
+@keyframes hpulse{50%{transform:scale(1.025)}}
+.hbanner{margin:12px 0;padding:14px;border-radius:16px;text-align:center;color:#2b1a00;background:linear-gradient(135deg,#ffe27a,#ff9f1c)}
+.hbanner b{display:block;font-size:30px;letter-spacing:2px;margin:4px 0}
+.hbanner.miss{color:inherit;background:rgba(255,255,255,.08)}
+.revword.hid{color:#ffd54a;text-shadow:0 0 18px rgba(255,180,40,.8)}
+.w.hid{background:linear-gradient(90deg,#ffd54a,#ff9f1c);color:#2b1a00;font-weight:800}
+
+/* tienda */
+.walletbtn{display:inline-block;font-size:15px;padding:6px 14px;border-radius:999px;background:rgba(0,0,0,.28);color:var(--sun);box-shadow:none}
+.walletbtn:active{transform:none;box-shadow:none}
+.shopgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin:14px 0}
+.item{background:rgba(0,0,0,.22);border-radius:18px;padding:10px;display:flex;flex-direction:column;gap:8px;text-align:center}
+.item.eq{outline:2px solid var(--sun)}
+.item b{font-weight:600}
+.item button{font-size:15px;padding:8px 10px}
+.item button.buy{background:var(--sun);color:var(--ink);box-shadow:0 4px 0 #c79f10}
+.item button:disabled:not(.buy){opacity:1;background:#1d6a6a;color:var(--sun);box-shadow:0 4px 0 #134a4a}
+.item button.buy:disabled{background:#555;color:#bbb;box-shadow:0 4px 0 #333}
+.pv{border-radius:12px;height:96px;display:grid;place-items:center;
+  background-color:var(--felt);background-image:var(--bg-extra),radial-gradient(300px 200px at 50% -10%,var(--bg-1) 0%,var(--felt) 55%,var(--felt-2) 100%);background-size:var(--bg-extra-size),auto}
+.pv .tile{width:56px;font-size:34px;cursor:default}
+.shopinfo{text-align:center;color:var(--sun);font-weight:600;margin-bottom:12px}
+
+/* misiones */
+.qhead{margin:18px 0 8px;color:var(--mute);font-weight:600;letter-spacing:.04em;text-transform:uppercase;font-size:13px}
+.quest{background:rgba(0,0,0,.22);border-radius:18px;padding:12px 14px;margin-bottom:10px}
+.quest.done{outline:2px solid var(--mint)}
+.quest.claimed{opacity:.55}
+.quest b{font-weight:600;display:block}
+.quest small{display:block;color:var(--mute);margin-top:2px;line-height:1.35}
+.qbar{height:8px;border-radius:999px;background:rgba(0,0,0,.35);overflow:hidden;margin:10px 0 8px}
+.qbar i{display:block;height:100%;background:var(--mint)}
+.qfoot{display:flex;justify-content:space-between;align-items:center;gap:10px;color:var(--sun);font-weight:600;font-size:15px}
+.qfoot button{font-size:15px;padding:7px 12px;background:var(--sun);color:var(--ink);box-shadow:0 3px 0 #c79f10}
+.qfoot button:disabled{background:#1d6a6a;color:var(--sun);box-shadow:0 3px 0 #134a4a;opacity:1}
+.walletbar{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+.walletbtn .dot{display:inline-block;min-width:1.3em;padding:0 .35em;margin-left:4px;border-radius:999px;background:var(--coral);color:#fff;font-size:12px;text-align:center}
+</style>
+</head>
+<body>
+<main>
+<div class="wallet" id="wallet" aria-live="polite"></div>
+
+<section id="shop" hidden>
+  <h2 class="logo" style="font-size:34px;margin:14px 0 4px">Tienda</h2>
+  <p class="shopinfo" id="shopCoins"></p>
+  <div class="seg" id="shopTabs" role="group" aria-label="Categorías"></div>
+  <div class="shopgrid" id="shopList"></div>
+  <button id="shopBack" class="alt" style="width:100%">Volver</button>
+</section>
+
+<section id="quests" hidden>
+  <h2 class="logo" style="font-size:34px;margin:14px 0 4px">Misiones</h2>
+  <p class="tag" style="margin-bottom:6px">Se renuevan cada día a medianoche.</p>
+  <p class="shopinfo" id="questCoins"></p>
+  <div id="questList"></div>
+  <button id="questBack" class="alt" style="width:100%;margin-top:6px">Volver</button>
+</section>
+
+<section id="join">
+  <h1 class="logo" aria-label="Letrazo"><span>L</span><span>E</span><span class="hot">T</span><span>R</span><span>A</span><span>Z</span><span>O</span></h1>
+  <p class="tag">Une letras vecinas y encuentra más palabras que nadie.</p>
+  <div class="panel">
+    <label for="name">Tu nombre</label>
+    <input id="name" type="text" maxlength="14" autocomplete="nickname" placeholder="Ej: Marta">
+    <div class="row" style="margin-top:14px"><button id="create">Crear sala</button></div>
+  </div>
+  <div class="panel">
+    <label for="code">¿Tienes un código?</label>
+    <div class="row">
+      <input id="code" type="text" maxlength="4" autocapitalize="characters" autocomplete="off" placeholder="ABCD" style="text-transform:uppercase">
+      <button id="enter" class="alt">Entrar</button>
+    </div>
+    <p class="error" id="joinErr" role="alert"></p>
+  </div>
+  <p class="rules">3 rondas. Desliza el dedo por letras que se toquen (también en diagonal) sin repetir ninguna. Si varios encuentran la misma palabra, el primero en escribirla se lleva todos los puntos y los demás, la mitad. Cada partida que juegas te da monedas.</p>
+</section>
+
+<section id="lobby" hidden>
+  <p class="tag" style="margin:14px 0 0">Código de la sala</p>
+  <div class="code" id="lobbyCode">----</div>
+  <div class="row" style="margin:14px 0"><button id="copy" class="alt">Copiar enlace para invitar</button></div>
+  <div class="panel">
+    <label>Jugadores</label>
+    <ul class="players" id="lobbyPlayers"></ul>
+  </div>
+  <div class="panel" id="settings">
+    <label>Modo de puntuación</label>
+    <div class="seg" id="segMode" role="group" aria-label="Modo de puntuación"></div>
+    <p class="rules" id="modeHint" style="margin:8px 0 0"></p>
+    <label style="margin-top:14px">Tamaño del tablero</label>
+    <div class="seg" id="segSize" role="group" aria-label="Tamaño del tablero"></div>
+    <label style="margin-top:14px">Mínimo de letras por palabra</label>
+    <div class="seg" id="segMin" role="group" aria-label="Mínimo de letras"></div>
+    <p class="rules" id="durHint" style="margin-top:12px"></p>
+  </div>
+  <button id="start" style="width:100%">Empezar partida</button>
+  <p class="tag" id="waitHost" style="margin-top:12px" hidden>Esperando a que el anfitrión empiece…</p>
+</section>
+
+<section id="game" hidden>
+  <div class="bar"><span id="roundLbl">Ronda 1/3</span><span class="time" id="time">1:30</span></div>
+  <div class="hhint" id="hiddenHint" hidden></div>
+  <div class="meter" id="meter"><i id="meterFill"></i></div>
+  <div class="current" id="current" aria-live="polite"></div>
+  <div class="toast" id="toast" role="status"></div>
+  <div class="tools" id="tools" hidden>
+    <button type="button" id="zoomOut" aria-label="Casillas más pequeñas">−</button>
+    <button type="button" id="zoomIn" aria-label="Casillas más grandes">+</button>
+    <button type="button" id="zoomFit">Ajustar</button>
+    <button type="button" id="moveBtn" aria-pressed="false" hidden>Mover tablero</button>
+  </div>
+  <div id="gridWrap"><div id="grid" aria-label="Tablero de letras"></div></div>
+  <form class="type" id="typeForm">
+    <input id="typed" type="text" maxlength="16" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="…o escribe la palabra y pulsa Intro">
+  </form>
+  <div class="found" id="found"></div>
+  <ul class="board" id="board"></ul>
+</section>
+
+<section id="results" hidden>
+  <h2 class="logo" style="font-size:34px;margin:14px 0 4px" id="resTitle">Fin de la ronda</h2>
+  <p class="tag" id="resSub">Las palabras tachadas las encontraron varios y no puntúan.</p>
+  <div id="resReveal" hidden>
+    <div class="panel" style="text-align:center">
+      <p class="tag" id="revCount" style="margin:0 0 6px"></p>
+      <div class="revword" id="revWord" aria-live="polite"></div>
+      <div id="revRows"></div>
+    </div>
+    <ul class="board" id="revBoard"></ul>
+    <div class="row" style="margin-top:14px"><button id="skip" class="alt">Saltar recuento</button></div>
+  </div>
+  <div id="resFinal">
+  <div id="resHidden"></div>
+  <div id="resList"></div>
+  <div id="resRepeat"></div>
+  <p class="coins" id="resCoins"></p>
+  <p class="coins" id="resQuests" style="margin-top:-8px"></p>
+  <button id="next" style="width:100%"></button>
+  <p class="tag" id="resWait" style="margin-top:12px" hidden>Esperando al anfitrión…</p>
+  </div>
+</section>
+
+</main>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const socket = io();
+const S = { size: 4, minLen: 3, me: null, room: null, grid: [], endsAt: 0, found: [], path: [], dragging: false, results: null };
+
+/* ---------- Pantallas ---------- */
+function show(id) { ['join','lobby','game','results','shop','quests'].forEach((s) => { $('#' + s).hidden = s !== id; }); }
+function render() {
+  const r = S.room;
+  $('main').className = r && r.phase === 'playing' ? 'w' + r.size : '';
+  $('#wallet').hidden = S.shopOpen || S.questsOpen || !!(r && r.phase === 'playing');
+  if (S.shopOpen) { show('shop'); return drawShop(); }
+  if (S.questsOpen) { show('quests'); return drawQuests(); }
+  if (!r) return show('join');
+  const isHost = r.hostId === S.me;
+  if (r.phase === 'lobby') {
+    show('lobby');
+    $('#lobbyCode').textContent = r.code;
+    $('#lobbyPlayers').innerHTML = r.players.map((p) =>
+      `<li class="${p.id === r.hostId ? 'host' : ''} ${p.id === S.me ? 'me' : ''}">${esc(p.name)}</li>`).join('');
+    $('#start').hidden = !isHost; $('#waitHost').hidden = isHost;
+    renderSettings(r, isHost);
+  } else if (r.phase === 'playing') {
+    show('game');
+    $('#roundLbl').textContent = `Ronda ${r.round}/${r.totalRounds} (mínimo ${r.minLen} letras)`;
+    $('#board').innerHTML = [...r.players].sort((a, b) => b.total - a.total).map((p) =>
+      `<li class="${p.id === S.me ? 'me' : ''}"><span>${esc(p.name)}<small>${p.count} palabras</small></span><b>${p.total} pts</b></li>`).join('');
+  } else if (r.phase === 'results' && S.results) {
+    show('results');
+    const R = S.results;
+    $('#resTitle').textContent = R.final ? 'Resultado final' : `Fin de la ronda ${R.round}`;
+    $('#resSub').textContent = (R.mode === 'letters' ? 'Cada letra suma un punto. ' : '')
+      + 'Si varios encuentran la misma palabra, el primero se lleva todo y los demás la mitad.';
+    $('#resList').innerHTML = R.results.map((p, i) => `
+      <article class="res ${i === 0 ? 'first' : ''}">
+        <header><h3>${i === 0 && R.final ? '🏆 ' : ''}${esc(p.name)}</h3><span class="pts">+${p.roundScore} · total ${p.total}</span></header>
+        <div class="words">${p.words.length
+          ? p.words.map(chip).join('')
+          : '<span class="none">Sin palabras</span>'}</div>
+      </article>`).join('');
+    const H = R.hidden;
+    $('#resHidden').innerHTML = !H ? '' : H.foundBy.length
+      ? `<div class="hbanner">🔒 La palabra escondida era<b>${esc(H.word)}</b>La encontró: ${H.foundBy.map(esc).join(', ')} (+${H.bonus} extra)</div>`
+      : `<div class="hbanner miss">🔒 La palabra escondida era<b>${esc(H.word)}</b>Nadie la encontró 😅</div>`;
+    $('#resRepeat').innerHTML = R.repeated && R.repeated.length
+      ? `<div class="res"><h3 style="margin-bottom:6px">Recuento de palabras repetidas</h3>${R.repeated.map((r) =>
+          `<div class="rep"><b>${esc(r.w)}</b>${r.order.map((n, i) => (i === 0 ? `1º ${esc(n)}` : `${i + 1}º ${esc(n)} (mitad)`)).join(', ')}</div>`).join('')}</div>`
+      : '';
+    $('#next').textContent = R.final ? 'Jugar otra vez' : `Empezar ronda ${R.round + 1}`;
+    $('#next').hidden = !isHost; $('#resWait').hidden = isHost;
+    const mine = R.results.find((p) => p.id === S.me);
+    $('#resCoins').textContent = mine ? coinText(mine.coins) : '';
+    $('#resQuests').textContent = S.questMsg || '';
+    const revealing = !!(S.reveal && S.reveal.active);
+    $('#resReveal').hidden = !revealing;
+    $('#resFinal').hidden = revealing;
+    if (revealing) {
+      $('#resTitle').textContent = 'Recuento';
+      $('#resSub').textContent = 'Palabra por palabra, a ver quién llegó primero.';
+    }
+  }
+}
+
+/* ---------- Unirse ---------- */
+function join(code) {
+  const name = $('#name').value.trim();
+  if (!name) { $('#joinErr').textContent = 'Escribe tu nombre primero.'; $('#name').focus(); return; }
+  localStorage.setItem('letrazo-name', name);
+  socket.emit('join', { name, code }, (res) => {
+    if (!res.ok) { $('#joinErr').textContent = res.error; return; }
+    S.me = res.id;
+    history.replaceState(null, '', '?sala=' + res.code);
+  });
+}
+$('#create').onclick = () => join('');
+$('#enter').onclick = () => join($('#code').value);
+$('#code').addEventListener('keydown', (e) => { if (e.key === 'Enter') join($('#code').value); });
+$('#copy').onclick = async () => {
+  const url = location.origin + '/?sala=' + S.room.code;
+  try { await navigator.clipboard.writeText(url); $('#copy').textContent = '¡Enlace copiado!'; }
+  catch (_) { prompt('Copia este enlace:', url); }
+  setTimeout(() => ($('#copy').textContent = 'Copiar enlace para invitar'), 1800);
+};
+$('#start').onclick = () => socket.emit('start');
+$('#next').onclick = () => socket.emit('next');
+try { $('#name').value = localStorage.getItem('letrazo-name') || ''; } catch (_) {}
+const qs = new URLSearchParams(location.search).get('sala');
+if (qs) $('#code').value = qs.toUpperCase();
+
+/* ---------- Eventos del servidor ---------- */
+socket.on('room:update', (r) => { S.room = r; render(); });
+socket.on('round:start', ({ grid, size, minLen, remaining, round, hiddenLen, hiddenBonus }) => {
+  if (S.size !== size) { S.tile = null; S.userZoom = false; }
+  S.size = size; S.minLen = minLen; S.shopOpen = false; S.questsOpen = false; S.questMsg = '';
+  stopReveal();
+  const hh = $('#hiddenHint');
+  hh.hidden = !hiddenLen;
+  if (hiddenLen) hh.textContent = `🔒 ¡Hay una PALABRA ESCONDIDA de ${hiddenLen} letras! Da +${hiddenBonus} puntos extra`;
+  S.grid = grid; S.found = []; S.path = []; S.results = null;
+  S.endsAt = Date.now() + remaining;
+  $('#grid').innerHTML = grid.map((l, i) => `<div class="tile" data-i="${i}">${l}</div>`).join('');
+  $('#found').innerHTML = ''; $('#current').textContent = ''; $('#toast').textContent = ''; $('#typed').value = '';
+  render();
+  layoutGrid();
+});
+socket.on('round:end', (R) => {
+  S.results = R; S.dragging = false;
+  startReveal(R);
+  const mine = R.results.find((p) => p.id === S.me);
+  if (mine) {
+    W.coins += mine.coins.round + mine.coins.match + mine.coins.win;
+    if (R.final && mine.coins.match > 0) W.games += 1;
+    saveWallet();
+    S.questMsg = updateQuests(R, mine);
+  }
+  render();
+});
+socket.on('disconnect', () => { S.room = null; S.me = null; render(); $('#joinErr').textContent = 'Se perdió la conexión. Vuelve a entrar a la sala.'; });
+
+/* ---------- Temporizador ---------- */
+setInterval(() => {
+  if (!S.room || S.room.phase !== 'playing') return;
+  const left = Math.max(0, S.endsAt - Date.now());
+  const sec = Math.ceil(left / 1000);
+  $('#time').textContent = `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
+  $('#meterFill').style.transform = `scaleX(${left / (S.room.duration * 1000)})`;
+  $('#meter').classList.toggle('low', sec <= 15);
+}, 150);
+
+/* ---------- Tablero: arrastrar ---------- */
+const grid = $('#grid');
+const adjacent = (a, b) => { const n = S.size; return a !== b && Math.abs(((a / n) | 0) - ((b / n) | 0)) <= 1 && Math.abs((a % n) - (b % n)) <= 1; };
+function tileAtXY(x, y) {
+  const el = document.elementFromPoint(x, y);
+  const t = el && el.closest && el.closest('.tile');
+  if (!t) return -1;
+  const r = t.getBoundingClientRect();
+  const d = Math.hypot(x - (r.left + r.width / 2), y - (r.top + r.height / 2));
+  return d < r.width * (S.size > 4 ? 0.5 : 0.42) ? +t.dataset.i : -1; // zona central: evita saltos en diagonal sin querer
+}
+const tileAt = (e) => tileAtXY(e.clientX, e.clientY);
+function paint() {
+  grid.querySelectorAll('.tile').forEach((t) => t.classList.toggle('on', S.path.includes(+t.dataset.i)));
+  $('#current').textContent = S.path.map((i) => S.grid[i]).join('');
+}
+function extendPath(i) {
+  const p = S.path;
+  if (i < 0 || i === p[p.length - 1]) return;
+  if (p.length > 1 && i === p[p.length - 2]) p.pop();
+  else if (!p.includes(i) && adjacent(p[p.length - 1], i)) p.push(i);
+  paint();
+}
+// En tableros grandes, si arrastras hasta el borde el tablero se desplaza solo
+let lastPt = null, raf = 0;
+function autoScroll() {
+  raf = 0;
+  if (!S.dragging || !lastPt || S.size === 4) return;
+  const w = $('#gridWrap'), r = w.getBoundingClientRect(), m = 40, v = 12;
+  const dx = lastPt.x < r.left + m ? -v : lastPt.x > r.right - m ? v : 0;
+  const dy = lastPt.y < r.top + m ? -v : lastPt.y > r.bottom - m ? v : 0;
+  if (dx || dy) { w.scrollLeft += dx; w.scrollTop += dy; extendPath(tileAtXY(lastPt.x, lastPt.y)); }
+  raf = requestAnimationFrame(autoScroll);
+}
+grid.addEventListener('pointerdown', (e) => {
+  if (S.move) return; // modo "Mover tablero": deja que el dedo desplace la vista
+  const i = tileAt(e); if (i < 0) return;
+  e.preventDefault(); S.dragging = true; S.path = [i]; lastPt = { x: e.clientX, y: e.clientY };
+  grid.setPointerCapture(e.pointerId); paint();
+  if (!raf) raf = requestAnimationFrame(autoScroll);
+});
+grid.addEventListener('pointermove', (e) => {
+  if (!S.dragging) return;
+  lastPt = { x: e.clientX, y: e.clientY };
+  extendPath(tileAt(e));
+});
+function endDrag() {
+  if (!S.dragging) return;
+  S.dragging = false;
+  const w = S.path.map((i) => S.grid[i]).join('');
+  S.path = []; paint(); $('#current').textContent = '';
+  if (w.length > 1) { if (w.length < S.minLen) toast(`Mínimo ${S.minLen} letras.`, false); else submit(w); }
+}
+grid.addEventListener('pointerup', endDrag);
+grid.addEventListener('pointercancel', endDrag);
+
+/* ---------- Enviar palabra ---------- */
+let toastT;
+function toast(msg, ok) {
+  const t = $('#toast'); t.textContent = msg; t.className = 'toast ' + (ok ? 'ok' : 'bad');
+  clearTimeout(toastT); toastT = setTimeout(() => (t.textContent = ''), 1600);
+}
+function submit(w) {
+  socket.emit('word', { word: w }, (res) => {
+    if (!res.ok) return toast(res.error, false);
+    S.found.unshift(res.word);
+    $('#found').innerHTML = S.found.map((x) => `<span class="chip">${esc(x)}</span>`).join('');
+    toast(res.hidden ? `🔒 ¡¡PALABRA ESCONDIDA!! +${res.pts} · ${res.word}` : `+${res.pts} · ${res.word}`, true);
+  });
+}
+$('#typeForm').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const w = $('#typed').value.trim(); $('#typed').value = '';
+  if (w) submit(w);
+});
+/* ---------- Recuento palabra por palabra ---------- */
+const REVEAL_MS = 2000; // pausa entre palabra y palabra
+
+function buildReveal(R) {
+  const map = new Map();
+  for (const p of R.results) {
+    for (const w of p.words) {
+      if (!map.has(w.w)) map.set(w.w, []);
+      map.get(w.w).push({ id: p.id, name: p.name, pts: w.pts, first: !!w.first, hidden: !!w.hidden });
+    }
+  }
+  const order = new Map((R.repeated || []).map((r) => [r.w, r.order]));
+  return [...map.entries()].map(([word, list]) => {
+    const ord = order.get(word);
+    list.sort((a, b) => (b.first - a.first) || (ord ? ord.indexOf(a.name) - ord.indexOf(b.name) : 0));
+    return { word, list, hidden: list.some((f) => f.hidden) };
+  }).sort((a, b) => (a.hidden - b.hidden) || a.word.length - b.word.length || a.word.localeCompare(b.word)); // de las cortas a las largas; la escondida, la última
+}
+
+function startReveal(R) {
+  stopReveal();
+  const steps = buildReveal(R);
+  if (!steps.length) { S.reveal = { active: false }; return; }
+  S.reveal = {
+    active: true, steps, i: -1, timer: null,
+    scores: new Map(R.results.map((p) => [p.id, 0])),
+    names: new Map(R.results.map((p) => [p.id, p.name])),
+  };
+  drawReveal();
+  S.reveal.timer = setTimeout(stepReveal, 1200);
+}
+function stepReveal() {
+  const V = S.reveal;
+  if (!V || !V.active) return;
+  V.i += 1;
+  if (V.i >= V.steps.length) return finishReveal();
+  for (const f of V.steps[V.i].list) V.scores.set(f.id, (V.scores.get(f.id) || 0) + f.pts);
+  drawReveal();
+  V.timer = setTimeout(stepReveal, REVEAL_MS);
+}
+function finishReveal() {
+  if (S.reveal) { clearTimeout(S.reveal.timer); S.reveal.active = false; }
+  render();
+}
+function stopReveal() {
+  if (S.reveal) { clearTimeout(S.reveal.timer); S.reveal.active = false; }
+}
+function drawReveal() {
+  const V = S.reveal;
+  if (!V || !V.steps) return;
+  const st = V.steps[V.i];
+  $('#revCount').textContent = st ? `Palabra ${V.i + 1} de ${V.steps.length}` : 'Empieza el recuento…';
+  $('#revWord').textContent = st ? st.word : '…';
+  $('#revWord').classList.toggle('hid', !!(st && st.hidden));
+  if (st && st.hidden) $('#revCount').textContent = '🔒 ¡LA PALABRA ESCONDIDA!';
+  $('#revRows').innerHTML = st ? st.list.map((f, i) => {
+    const solo = st.list.length === 1;
+    const label = solo ? `Solo ${esc(f.name)}` : `${i + 1}º ${esc(f.name)}${i > 0 ? ' (mitad)' : ''}`;
+    return `<div class="revrow ${i > 0 ? 'half' : ''}"><span>${label}</span><b>+${f.pts}</b></div>`;
+  }).join('') : '';
+  $('#revBoard').innerHTML = [...V.scores.entries()].sort((a, b) => b[1] - a[1]).map(([id, pts]) =>
+    `<li class="${id === S.me ? 'me' : ''}"><span>${esc(V.names.get(id))}</span><b>${pts} pts</b></li>`).join('');
+}
+$('#skip').onclick = () => finishReveal();
+
+/* ---------- Palabra en los resultados ---------- */
+function chip(w) {
+  const cls = (w.shared && !w.first ? 'w half' : 'w') + (w.hidden ? ' hid' : '');
+  const tag = w.shared ? (w.first ? ' 1º' : ' ½') : '';
+  const tip = w.shared ? (w.first ? 'La escribiste primero: puntos completos' : 'Otro jugador la escribió antes: mitad de puntos') : '';
+  return `<span class="${cls}" title="${tip}">${w.hidden ? '🔒 ' : ''}${esc(w.w)} +${w.pts}${tag}</span>`;
+}
+
+/* ---------- Ajustes de sala (anfitrión) ---------- */
+function renderSettings(r, isHost) {
+  const seg = (sel, opts, cur, label) => {
+    $(sel).innerHTML = opts.map((v) => `<button type="button" data-v="${v}" aria-pressed="${v === cur}" ${isHost ? '' : 'disabled'}>${label(v)}</button>`).join('');
+  };
+  seg('#segMode', ['classic', 'letters'], r.mode, (v) => (v === 'classic' ? 'Clásico' : 'Por letras'));
+  $('#modeHint').textContent = r.mode === 'letters'
+    ? 'Cada palabra vale tantos puntos como letras tiene. Si otro jugador la escribió antes, te llevas la mitad.'
+    : 'Las palabras largas valen más. Si otro jugador la escribió antes, te llevas la mitad.';
+  seg('#segSize', [4, 8, 16], r.size, (v) => `${v}×${v}`);
+  seg('#segMin', [3, 4, 5], r.minLen, (v) => v);
+  const d = r.duration;
+  $('#durHint').textContent = `Cada ronda dura ${Math.floor(d / 60)}:${String(d % 60).padStart(2, '0')}.` + (isHost ? '' : ' Solo el anfitrión puede cambiar los ajustes.');
+}
+$('#segMode').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (b && !b.disabled) socket.emit('settings', { mode: b.dataset.v });
+});
+$('#segSize').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (b && !b.disabled) socket.emit('settings', { size: +b.dataset.v, minLen: S.room.minLen });
+});
+$('#segMin').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (b && !b.disabled) socket.emit('settings', { size: S.room.size, minLen: +b.dataset.v });
+});
+
+/* ---------- Tamaño del tablero en pantalla ---------- */
+function layoutGrid() {
+  const g = $('#grid'), w = $('#gridWrap'), n = S.size;
+  g.className = 'g' + n;
+  w.dataset.n = n;
+  $('#game').classList.toggle('big', n > 4);
+  $('#tools').hidden = n === 4;
+  g.style.setProperty('--n', n);
+  if (n === 4) {
+    g.style.setProperty('--gap', '10px');
+    g.style.removeProperty('--tile');
+    g.style.fontSize = Math.max(8, (g.clientWidth / n) * 0.52) + 'px';
+    return;
+  }
+  const gap = n === 8 ? 5 : 3;
+  g.style.setProperty('--gap', gap + 'px');
+  if (!S.tile) {
+    // tamaño por defecto: el mayor que cabe entero en pantalla, sin bajar de un mínimo cómodo
+    const wide = matchMedia('(min-width:1000px)').matches;
+    const availW = w.clientWidth - 16;
+    const availH = (wide ? innerHeight - 56 : Math.max(300, innerHeight - 300)) - 16;
+    const fit = Math.floor(Math.min((availW - gap * (n - 1)) / n, (availH - gap * (n - 1)) / n));
+    const min = matchMedia('(pointer: coarse)').matches ? 40 : 34;
+    S.tile = Math.max(min, Math.min(96, fit));
+  }
+  g.style.setProperty('--tile', S.tile + 'px');
+  g.style.fontSize = Math.round(S.tile * 0.52) + 'px';
+}
+let lastW = innerWidth;
+window.addEventListener('resize', () => {
+  if (innerWidth === lastW) return; // en móvil la barra del navegador cambia la altura: no recolocar a mitad de partida
+  lastW = innerWidth;
+  if (!S.userZoom) S.tile = null;
+  if (S.room && S.room.phase === 'playing') layoutGrid();
+});
+const clampTile = (v) => Math.max(24, Math.min(110, v));
+$('#zoomIn').onclick = () => { S.tile = clampTile((S.tile || 40) + 6); S.userZoom = true; layoutGrid(); };
+$('#zoomOut').onclick = () => { S.tile = clampTile((S.tile || 40) - 6); S.userZoom = true; layoutGrid(); };
+$('#zoomFit').onclick = () => { S.tile = null; S.userZoom = false; layoutGrid(); };
+$('#moveBtn').hidden = !matchMedia('(pointer: coarse)').matches; // solo en pantallas táctiles
+$('#moveBtn').onclick = () => {
+  S.move = !S.move;
+  $('#moveBtn').setAttribute('aria-pressed', S.move);
+  $('#gridWrap').classList.toggle('move', S.move);
+};
+
+/* ---------- Monedas (se guardan en este navegador) ---------- */
+const W = { coins: 0, games: 0 };
+try { W.coins = +localStorage.getItem('letrazo-coins') || 0; W.games = +localStorage.getItem('letrazo-games') || 0; } catch (_) {}
+function drawWallet() {
+  const n = claimableCount();
+  $('#wallet').innerHTML = `<div class="walletbar"><button type="button" class="walletbtn" id="openQuests">🎯 Misiones${n ? `<span class="dot">${n}</span>` : ''}</button>`
+    + `<button type="button" class="walletbtn" id="openShop">🪙 ${W.coins} · 🛍️ Tienda</button></div>`;
+  if (S.shopOpen) drawShop();
+  if (S.questsOpen) drawQuests();
+}
+function saveWallet() {
+  try { localStorage.setItem('letrazo-coins', W.coins); localStorage.setItem('letrazo-games', W.games); } catch (_) {}
+  drawWallet();
+}
+function coinText(c) {
+  const t = c.round + c.match + c.win;
+  if (!t) return 'Esta ronda no suma monedas: encuentra al menos una palabra.';
+  let s = `+${t} monedas: ronda jugada +${c.round}`;
+  if (c.match) s += `, partida completa +${c.match}`;
+  if (c.win) s += `, ganador +${c.win}`;
+  return s;
+}
+
+/* ---------- Tienda (cosméticos solo para ti, se guardan en este navegador) ---------- */
+const BG_STARS = 'radial-gradient(1.5px 1.5px at 20px 30px,#fff,transparent),radial-gradient(1px 1px at 90px 80px,#fff,transparent),radial-gradient(1.5px 1.5px at 150px 20px,#ffe9a8,transparent),radial-gradient(1px 1px at 60px 110px,#cfe3ff,transparent)';
+const SHOP = {
+  font: { label: 'Letras', items: [
+    { id: 'classic', name: 'Redondeada', price: 0, v: { '--tfont': "var(--font)", '--fs': 1, '--fw': 700 } },
+    { id: 'typewriter', name: 'Máquina de escribir', price: 40, v: { '--tfont': "'Special Elite','Courier New',monospace", '--fs': 0.92, '--fw': 400 } },
+    { id: 'hand', name: 'A mano', price: 50, v: { '--tfont': "'Caveat','Comic Sans MS',cursive", '--fs': 1.3, '--fw': 700 } },
+    { id: 'serif', name: 'Elegante', price: 60, v: { '--tfont': "'Playfair Display',Georgia,serif", '--fs': 1, '--fw': 900 } },
+    { id: 'pixel', name: 'Píxel retro', price: 80, v: { '--tfont': "'Press Start 2P',monospace", '--fs': 0.62, '--fw': 400 } },
+    { id: 'sign', name: 'Letrero', price: 100, v: { '--tfont': "'Bungee','Impact',sans-serif", '--fs': 0.9, '--fw': 400 } },
+  ] },
+  tile: { label: 'Fichas', items: [
+    { id: 'ivory', name: 'Marfil', price: 0, v: {} },
+    { id: 'slate', name: 'Pizarra', price: 40, v: { '--t-bg': '#2a2f3a', '--t-fg': '#f4e8c8', '--t-edge': '#14171d' } },
+    { id: 'bubble', name: 'Chicle', price: 50, v: { '--t-bg': '#ff9ecb', '--t-fg': '#5a0f3a', '--t-edge': '#d1568f' } },
+    { id: 'wood', name: 'Madera', price: 50, v: { '--t-bg': 'linear-gradient(145deg,#c58b52,#8a5a2b)', '--t-fg': '#3b2210', '--t-edge': '#5e3b1a' } },
+    { id: 'ice', name: 'Hielo', price: 60, v: { '--t-bg': 'linear-gradient(145deg,#e8fbff,#a9e3f5)', '--t-fg': '#0b4a63', '--t-edge': '#6fb8d1' } },
+    { id: 'neon', name: 'Neón', price: 70, v: { '--t-bg': '#0d1020', '--t-fg': '#5ff3ff', '--t-edge': '#00a3b3', '--t-glow': '0 0 .4em #5ff3ff', '--t-on': '#ff2bd6', '--t-on-fg': '#fff', '--t-on-edge': '#a3008a' } },
+    { id: 'gold', name: 'Oro', price: 120, v: { '--t-bg': 'linear-gradient(145deg,#ffe27a,#d9a21b)', '--t-fg': '#4a3200', '--t-edge': '#9a7210', '--t-on': '#fff3b0', '--t-on-edge': '#c79f10' } },
+  ] },
+  bg: { label: 'Fondos', items: [
+    { id: 'felt', name: 'Tapete verde', price: 0, v: {} },
+    { id: 'chalk', name: 'Pizarra y tiza', price: 40, v: { '--felt': '#22302b', '--felt-2': '#18221e', '--bg-1': '#2f4339', '--board-bg': 'rgba(0,0,0,.28)',
+      '--bg-extra': 'linear-gradient(rgba(255,255,255,.07) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.07) 1px,transparent 1px)', '--bg-extra-size': '28px 28px,28px 28px' } },
+    { id: 'ocean', name: 'Océano', price: 50, v: { '--felt': '#06476b', '--felt-2': '#032a44', '--bg-1': '#1aa6c9', '--board-bg': 'rgba(3,42,68,.5)',
+      '--bg-extra': 'repeating-linear-gradient(115deg,rgba(255,255,255,.05) 0 2px,transparent 2px 22px)', '--bg-extra-size': 'auto' } },
+    { id: 'sunset', name: 'Atardecer', price: 60, v: { '--felt': '#4a1942', '--felt-2': '#1f0a2b', '--bg-1': '#ff7a59', '--board-bg': 'rgba(30,8,40,.4)' } },
+    { id: 'night', name: 'Noche estrellada', price: 70, v: { '--felt': '#0a0e27', '--felt-2': '#05071a', '--bg-1': '#1d2660', '--board-bg': 'rgba(5,7,26,.55)',
+      '--bg-extra': BG_STARS, '--bg-extra-size': '180px 130px,180px 130px,180px 130px,180px 130px' } },
+    { id: 'volcano', name: 'Volcán', price: 90, v: { '--felt': '#3b0d0d', '--felt-2': '#1a0505', '--bg-1': '#c23b0f', '--board-bg': 'rgba(26,5,5,.5)',
+      '--bg-extra': 'repeating-linear-gradient(0deg,rgba(255,120,40,.06) 0 3px,transparent 3px 26px)', '--bg-extra-size': 'auto' } },
+  ] },
+};
+const DEFAULT_VARS = { '--tfont': 'var(--font)', '--fs': 1, '--fw': 700, '--t-bg': 'var(--ivory)', '--t-fg': '#2a1f14', '--t-edge': 'var(--ivory-edge)', '--t-glow': 'none',
+  '--t-on': 'var(--sun)', '--t-on-fg': '#2a1f14', '--t-on-edge': '#c79f10', '--felt': '#0f3d3e', '--felt-2': '#0b2e2f', '--bg-1': '#17595a',
+  '--bg-extra': 'none', '--bg-extra-size': 'auto', '--board-bg': 'rgba(0,0,0,.2)' };
+const STORE = { owned: { font: ['classic'], tile: ['ivory'], bg: ['felt'] }, eq: { font: 'classic', tile: 'ivory', bg: 'felt' } };
+try {
+  const saved = JSON.parse(localStorage.getItem('letrazo-shop') || 'null');
+  if (saved) for (const c of Object.keys(SHOP)) {
+    const ids = SHOP[c].items.map((i) => i.id);
+    const own = ((saved.owned || {})[c] || []).filter((id) => ids.includes(id));
+    STORE.owned[c] = [...new Set([...STORE.owned[c], ...own])];
+    const eq = (saved.eq || {})[c];
+    if (STORE.owned[c].includes(eq)) STORE.eq[c] = eq;
+  }
+} catch (_) {}
+const saveStore = () => { try { localStorage.setItem('letrazo-shop', JSON.stringify(STORE)); } catch (_) {} };
+const findItem = (c, id) => SHOP[c].items.find((i) => i.id === id);
+function varsFor(eq) {
+  const v = { ...DEFAULT_VARS };
+  for (const c of Object.keys(SHOP)) Object.assign(v, findItem(c, eq[c]).v);
+  return v;
+}
+function applyTheme() {
+  const v = varsFor(STORE.eq), root = document.documentElement.style;
+  for (const k in v) root.setProperty(k, v[k]);
+}
+let shopTab = 'font';
+function drawShop() {
+  $('#shopCoins').textContent = `🪙 ${W.coins} monedas`;
+  $('#shopTabs').innerHTML = Object.entries(SHOP).map(([c, d]) => `<button type="button" data-c="${c}" aria-pressed="${c === shopTab}">${d.label}</button>`).join('');
+  $('#shopList').innerHTML = SHOP[shopTab].items.map((it) => {
+    const owned = STORE.owned[shopTab].includes(it.id), eq = STORE.eq[shopTab] === it.id;
+    const pv = Object.entries(varsFor({ ...STORE.eq, [shopTab]: it.id })).map(([k, x]) => `${k}:${x}`).join(';');
+    const btn = eq ? '<button type="button" disabled>Equipado ✓</button>'
+      : owned ? `<button type="button" class="alt" data-act="equip" data-id="${it.id}">Equipar</button>`
+      : `<button type="button" class="buy" data-act="buy" data-id="${it.id}" ${W.coins < it.price ? 'disabled' : ''}>🪙 ${it.price} · Comprar</button>`;
+    return `<div class="item ${eq ? 'eq' : ''}"><div class="pv" style="${esc(pv)}"><div class="tile">${shopTab === 'font' ? 'Ñ' : 'A'}</div></div><b>${esc(it.name)}</b>${btn}</div>`;
+  }).join('');
+}
+document.addEventListener('click', (e) => {
+  if (e.target.closest('#openShop')) { S.shopOpen = true; return render(); }
+  if (e.target.closest('#shopBack')) { S.shopOpen = false; return render(); }
+  const tab = e.target.closest('#shopTabs button');
+  if (tab) { shopTab = tab.dataset.c; return drawShop(); }
+  const b = e.target.closest('#shopList button[data-act]');
+  if (!b || b.disabled) return;
+  const it = findItem(shopTab, b.dataset.id);
+  if (b.dataset.act === 'buy') {
+    if (W.coins < it.price || STORE.owned[shopTab].includes(it.id)) return;
+    W.coins -= it.price; STORE.owned[shopTab].push(it.id); saveWallet();
+  }
+  STORE.eq[shopTab] = it.id; saveStore(); applyTheme(); drawShop();
+});
+applyTheme();
+
+/* ---------- Misiones y retos diarios (progreso en este navegador) ---------- */
+// Los objetivos de puntos están pensados para 4×4 en modo clásico y se multiplican según el tablero y el modo.
+const SIZE_F = { 4: 1, 8: 3, 16: 6 }, MODE_F = { classic: 1, letters: 2 };
+const dayKey = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+function rngFor(str) {
+  let h = 2166136261; for (const c of str) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); }
+  let a = h >>> 0;
+  return () => { a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+}
+const SCORE_HINT = 'En tablero 8×8 el objetivo se multiplica ×3 y en 16×16 ×6; en modo «Por letras», ×2.';
+const MISSION_POOL = {
+  words: { t: [12, 18, 25], r: [8, 10, 14], text: (t) => `Encuentra ${t} palabras (sumando todas tus rondas de hoy)` },
+  rounds: { t: [3, 4, 6], r: [8, 10, 14], text: (t) => `Juega ${t} rondas encontrando al menos una palabra` },
+  wordsRound: { t: [8, 12, 16], r: [10, 12, 15], text: (t) => `Encuentra ${t} palabras en una sola ronda` },
+  long: { t: [5, 6, 7], r: [8, 12, 18], text: (t) => `Encuentra una palabra de ${t} letras o más` },
+  game: { t: [1, 2], r: [12, 22], text: (t) => (t === 1 ? 'Completa una partida de 3 rondas' : 'Completa 2 partidas de 3 rondas') },
+  hidden: { t: [1], r: [20], text: () => 'Encuentra la palabra escondida' },
+};
+const CHALLENGES = {
+  scoreRound: { t: [15, 25, 35], r: [20, 30, 45], text: (t) => `Consigue ${t} puntos en una sola ronda`, hint: SCORE_HINT },
+  scoreGame: { t: [45, 65, 85], r: [25, 40, 60], text: (t) => `Consigue ${t} puntos en una partida completa (3 rondas)`, hint: SCORE_HINT },
+};
+const ALL_BONUS = 20;
+function genQuests(day) {
+  const rnd = rngFor('letrazo' + day), list = [];
+  const kinds = Object.keys(MISSION_POOL);
+  for (let i = kinds.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [kinds[i], kinds[j]] = [kinds[j], kinds[i]]; }
+  for (const k of kinds.slice(0, 3)) {
+    const d = MISSION_POOL[k], i = Math.floor(rnd() * d.t.length);
+    list.push({ id: k, group: 'm', kind: k, target: d.t[i], reward: d.r[i], text: d.text(d.t[i]) });
+  }
+  for (const k of Object.keys(CHALLENGES)) {
+    const d = CHALLENGES[k], i = Math.floor(rnd() * d.t.length);
+    list.push({ id: k, group: 'c', kind: k, target: d.t[i], reward: d.r[i], text: d.text(d.t[i]), hint: d.hint });
+  }
+  return list;
+}
+let Q = { day: '', prog: {}, claimed: {} };
+try { Q = JSON.parse(localStorage.getItem('letrazo-quests') || 'null') || Q; } catch (_) {}
+const saveQ = () => { try { localStorage.setItem('letrazo-quests', JSON.stringify(Q)); } catch (_) {} };
+let QL = [];
+function loadDay() {
+  const d = dayKey();
+  if (Q.day !== d) { Q = { day: d, prog: {}, claimed: {} }; saveQ(); }
+  if (!QL.length || QL.day !== d) { QL = genQuests(d); QL.day = d; }
+}
+const qDone = (q) => (Q.prog[q.id] || 0) >= q.target - 1e-9;
+const allDone = () => QL.every(qDone);
+function claimableCount() {
+  loadDay();
+  return QL.filter((q) => qDone(q) && !Q.claimed[q.id]).length + (allDone() && !Q.claimed.all ? 1 : 0);
+}
+function updateQuests(R, mine) {
+  loadDay();
+  const before = new Set(QL.filter(qDone).map((q) => q.id));
+  const f = (SIZE_F[S.size] || 1) * (MODE_F[R.mode] || 1);
+  const n = mine.words.length, longest = mine.words.reduce((m, w) => Math.max(m, w.w.length), 0);
+  const add = (id, v) => { Q.prog[id] = (Q.prog[id] || 0) + v; };
+  const max = (id, v) => { Q.prog[id] = Math.max(Q.prog[id] || 0, v); };
+  add('words', n);
+  if (mine.played) { add('rounds', 1); max('wordsRound', n); max('long', longest); max('scoreRound', mine.roundScore / f); }
+  if (mine.words.some((w) => w.hidden)) max('hidden', 1);
+  if (R.final && mine.coins.match > 0) { add('game', 1); max('scoreGame', mine.total / f); }
+  saveQ(); drawWallet();
+  const fresh = QL.filter((q) => qDone(q) && !before.has(q.id));
+  return fresh.length ? `🎯 ${fresh.length > 1 ? 'Misiones completadas' : 'Misión completada'}: ${fresh.map((q) => q.text).join(' · ')}. Reclámalas en 🎯 Misiones.` : '';
+}
+function drawQuests() {
+  loadDay();
+  $('#questCoins').textContent = `🪙 ${W.coins} monedas`;
+  const card = (q) => {
+    const p = Math.min(Q.prog[q.id] || 0, q.target), done = qDone(q), got = !!Q.claimed[q.id];
+    const btn = got ? '<button type="button" disabled>Reclamada ✓</button>'
+      : done ? `<button type="button" data-claim="${q.id}">Reclamar +${q.reward} 🪙</button>`
+      : `<span>+${q.reward} 🪙</span>`;
+    return `<div class="quest ${done ? 'done' : ''} ${got ? 'claimed' : ''}"><b>${esc(q.text)}</b>${q.hint ? `<small>${esc(q.hint)}</small>` : ''}`
+      + `<div class="qbar"><i style="width:${(p / q.target) * 100}%"></i></div><div class="qfoot"><span>${Math.floor(p)} / ${q.target}</span>${btn}</div></div>`;
+  };
+  const bonusDone = allDone(), bonusGot = !!Q.claimed.all;
+  $('#questList').innerHTML = '<div class="qhead">Misiones del día</div>' + QL.filter((q) => q.group === 'm').map(card).join('')
+    + '<div class="qhead">Retos de puntuación</div>' + QL.filter((q) => q.group === 'c').map(card).join('')
+    + `<div class="qhead">Bonus</div><div class="quest ${bonusDone ? 'done' : ''} ${bonusGot ? 'claimed' : ''}"><b>Completa todas las misiones y retos de hoy</b>`
+    + `<div class="qfoot" style="margin-top:8px"><span>${QL.filter(qDone).length} / ${QL.length}</span>`
+    + (bonusGot ? '<button type="button" disabled>Reclamado ✓</button>' : bonusDone ? `<button type="button" data-claim="all">Reclamar +${ALL_BONUS} 🪙</button>` : `<span>+${ALL_BONUS} 🪙</span>`) + '</div></div>';
+}
+document.addEventListener('click', (e) => {
+  if (e.target.closest('#openQuests')) { S.questsOpen = true; return render(); }
+  if (e.target.closest('#questBack')) { S.questsOpen = false; return render(); }
+  const b = e.target.closest('[data-claim]');
+  if (!b) return;
+  loadDay();
+  const id = b.dataset.claim;
+  if (Q.claimed[id]) return;
+  if (id === 'all') { if (!allDone()) return; W.coins += ALL_BONUS; }
+  else { const q = QL.find((x) => x.id === id); if (!q || !qDone(q)) return; W.coins += q.reward; }
+  Q.claimed[id] = true; saveQ(); saveWallet();
+});
+drawWallet();
+</script>
+</body>
+</html>
